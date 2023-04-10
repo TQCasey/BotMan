@@ -12,12 +12,13 @@ class BotClient {
     static appsec = "s9f8F71GXZg658SHeIjOcfDXQIh156aH";
     static chatSessions = {};
 
-    static async requestBot (chat_id,ques) {
+    static async requestBot (chat_id,ques,useProxy) {
 
         let prevAnswer = BotClient.chatSessions [chat_id] || {};
         let parenttId = prevAnswer.messageId
 
         console.log (`parentMsgId => ${parenttId}`)
+        let proxyStr = useProxy ? "http://127.0.0.1:7890" : null;
 
         return new Promise ((resolve,reject) => {
             request.post ("http://154.23.191.79/chat",{
@@ -26,7 +27,7 @@ class BotClient {
                     conversationId : chat_id,
                     parentMessageId : parenttId,
                 }),
-                // proxy :"http://127.0.0.1:7890",
+                proxy : proxyStr,
                 headers : {
                     "Content-Type": "application/json",
                 },
@@ -143,7 +144,7 @@ app.post('/', async (req, res) => {
             
             await BotClient.reply ("好的，稍等...",chat_id);
 
-            let answer = await BotClient.requestBot (chat_id,chat_msg);
+            let answer = await BotClient.requestBot (chat_id,chat_msg,false);
 
             // save  chat sessions 
             BotClient.chatSessions [chat_id] = answer;
@@ -174,7 +175,7 @@ app.post('/chat', async (req, res) => {
             console.log ("chat_msg",chat_msg);
             console.log ("chat_id",chat_id);
 
-            let answer = await BotClient.requestBot (chat_id,chat_msg);
+            let answer = await BotClient.requestBot (chat_id,chat_msg,false);
 
             // save  chat sessions 
             BotClient.chatSessions [chat_id] = answer;
