@@ -4,6 +4,7 @@ import express from "express";
 import request from "request";
 import bodyParser from "body-parser";
 import uuid4 from "uuid4";
+import RedisUtil from "./redis";
 
 class BotClient {
 
@@ -19,9 +20,12 @@ class BotClient {
 
         console.log (`parentMsgId => ${parenttId}`)
         let proxyStr = useProxy ? "http://127.0.0.1:7890" : null;
+        let serverUrl = "http://154.23.191.79/chat";
+
+        let res = await RedisUtil.getInstance ().getItem ("ChatGPT-API-URL");
 
         return new Promise ((resolve,reject) => {
-            request.post ("http://154.23.191.79/chat",{
+            request.post (serverUrl,{
                 body : JSON.stringify ({
                     message : ques,
                     conversationId : chat_id,
