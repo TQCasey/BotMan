@@ -10,37 +10,6 @@ import { AI_PROMPT, Client, HUMAN_PROMPT } from "@anthropic-ai/sdk";
 
 class BotClient {
 
-    static TempDict = {
-        textMessage : function (message,fromuser,touser) {
-            let createTime = new Date ().getTime ();
-            let send_msg = `
-            <xml>
-                <ToUserName><![CDATA[${touser}]]></ToUserName>
-                <FromUserName><![CDATA[${fromuser}]]></FromUserName>
-                <CreateTime>${createTime}</CreateTime>
-                <MsgType><![CDATA[text]]></MsgType>
-                <Content><![CDATA[${message}]]></Content>
-            </xml>
-            `;
-            return send_msg;
-        }
-        ,
-        imageMessage : function (message) {
-            var createTime = new Date ().getTime ();
-            return `${createTime}`
-        }
-        ,
-        voiceMessage : function (message) {
-            var createTime = new Date ().getTime ();
-            return `${createTime}`
-        }
-        ,
-        videoMessage : function (message) {
-            var createTime = new Date ().getTime ();
-            return `${createTime}`
-        }
-    }
-
     static token = "t-g10443hnHSES5555IXZAQF2U3IUAEOVMDW7RLGZM";
     static appid = "wx913b4e6ef0f77296";
     static appsec = "10d6526ecf73067ee830ded4247524ee";
@@ -116,8 +85,16 @@ class BotClient {
         let chat_msg = xml.content;
         let fromusername = xml.fromusername;
         let tousername = xml.tousername ;
-        let send_msg = BotClient.TempDict.textMessage (msg,tousername [0],fromusername [0])
-        
+
+        let send_msg = `
+        <xml>
+            <ToUserName><![CDATA[${fromusername [0]}]]></ToUserName>
+            <FromUserName><![CDATA[${tousername [0]}]]></FromUserName>
+            <CreateTime>${new Date ().getTime ()}</CreateTime>
+            <MsgType><![CDATA[text]]></MsgType>
+            <Content><![CDATA[${msg}]]></Content>
+        </xml>
+        `;
         return new Promise ((resolve,reject) => {
             res.send (send_msg);
             resolve (true);
@@ -161,55 +138,18 @@ class BotClient {
 }
 
 const app = express()
-const port = 3200
+const port = 3300
 
 app.use(express.json ());
 app.use(express.urlencoded ());
 app.use(xmlparser ());
 
-
-app.post('/claude', async (req, res) => {
-    console.log (req.body);
+app.post('/coin', async (req, res) => {
     BotClient.requestClaude (req.body.question);
 })
 
-app.post('/', async (req, res) => {
-
-    console.log (req.body);
-    
-    // res.status(200).send("success");
-    
-    let xml = req.body.xml;
-    let msgtype = xml.msgtype;
-
-    switch (msgtype [0]) {
-        case "text":
-
-            console.log ("Requesting ...");
-
-            // let answer = await BotClient.requestQ (chat_msg [0]);
-            let amsg = "";
-
-            // if (answer && answer.response) {
-            //     amsg = answer?.response
-            //     console.log ("answer",amsg);
-            // } else {
-            //     amsg = `AI不在线,稍后再试...`;
-            // }
-
-            amsg = `AI不在线,稍后再试...`;
-            await BotClient.reply (res,amsg,xml);
-            break;
-        default:
-            amsg = `只可以发文字哦...`;
-            await BotClient.reply (res,amsg,xml);
-    }
-})
-
 app.get('/', async (req, res) => {
-    let argstr = url.parse (req.url).query;
-    let argv = querystring.parse(argstr) || {};
-    res.status(200).send (argv ["echostr"])
+    res.send ("helloworld");
 })
 
 app.listen(port, async () => {
