@@ -6,112 +6,55 @@ import uuid4 from "uuid4";
 import xmlparser from "express-xml-bodyparser"
 import querystring from "querystring"
 import url from 'url'
-import { AI_PROMPT, Client, HUMAN_PROMPT } from "@anthropic-ai/sdk";
 
 class BotClient {
 
-    static token = "t-g10443hnHSES5555IXZAQF2U3IUAEOVMDW7RLGZM";
-    static appid = "wx913b4e6ef0f77296";
-    static appsec = "10d6526ecf73067ee830ded4247524ee";
+    static apikeys = [
+        "b8fcb0c9-2649-4800-85d3-3c8fc1d09685",
+    ]
+    static curApiKeyIndex = 0;
+    static bRun = false;
 
-    static async requestQ (ques) {
+    static getValidKey () {
+        return this.apikeys [this.curApiKeyIndex];
+    }
+
+    static async requestCoinInfo (params) {
+        
+        let key = this.getValidKey ();
+
         return new Promise ((resolve,reject) => {
-            request.post ("http://154.23.191.79/chat",{
-                body : JSON.stringify ({
-                    message : ques,
-                }),
-                // proxy :"http://127.0.0.1:7890",
+
+            let queryParams = new URLSearchParams({
+                "symbol": "CFX,DOGE",
+                "convert": "USD"
+            })
+
+            request.get (`https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?${queryParams}`,{
+                proxy :"http://127.0.0.1:7890",
                 headers : {
                     "Content-Type": "application/json",
+                    "X-CMC_PRO_API_KEY": key
                 },
             
             },(error,resp,body) => {
                 if (!error && resp.statusCode == 200) {
                     let resp = JSON.parse(body);
-                    // console.log (resp.choices [0].message.content);
                     resolve (resp);
                 } else {
-                    console.log (error);
+                    reject (error);
                 }
             })
         })
     }
 
-    static requestClaude (ques) {
-        const client = new Client(apiKey);
-        client.complete({
-            prompt: `${HUMAN_PROMPT} ${ques} ${AI_PROMPT}`,
-            stop_sequences: [HUMAN_PROMPT],
-            max_tokens_to_sample: 200,
-            model: "claude-v1",
-        })
-        .then((finalSample) => {
-            console.log(finalSample.completion);
-        })
-        .catch((error) => {
-            console.error(error);
-        });
-    }
-
-    static fetchToken () {
-
+    static notifyMsg (msg) {
         return new Promise ((resolve,reject) => {
-            request.get (`https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=${BotClient.appid}&secret=${BotClient.appsec}`,{
-                headers : {
-                    "Content-Type": "application/json",
-                },
-            
-            },(error,resp,body) => {
-
-                console.log (error,body);
-
-                if (!error && resp.statusCode == 200) {
-                    let resp = JSON.parse(body);
-                    if (resp.code == 0) {
-                        BotClient.token = resp.access_token
-                        console.log ("New Token " + BotClient.token);
-                    }
-                    resolve (resp);
-                } else {
-                    console.log ("FetchToken Error" + resp.statusCode);
-                }
-            })
-        })
-    }
-
-    static reply(res,msg,xml) {
-
-        let msgid = xml.msgid;
-        let chat_msg = xml.content;
-        let fromusername = xml.fromusername;
-        let tousername = xml.tousername ;
-
-        let send_msg = `
-        <xml>
-            <ToUserName><![CDATA[${fromusername [0]}]]></ToUserName>
-            <FromUserName><![CDATA[${tousername [0]}]]></FromUserName>
-            <CreateTime>${new Date ().getTime ()}</CreateTime>
-            <MsgType><![CDATA[text]]></MsgType>
-            <Content><![CDATA[${msg}]]></Content>
-        </xml>
-        `;
-        return new Promise ((resolve,reject) => {
-            res.send (send_msg);
-            resolve (true);
-        });
-    }
-
-    static replyAsync (msg,toUserId) {
-
-        console.log (`msg => ${msg},toUserId => ${toUserId}`)
-
-        return new Promise ((resolve,reject) => {
-            request.post (`https://api.weixin.qq.com/cgi-bin/message/custom/send?access_token=${BotClient.token}`,{
+            request.post (`https://open.feishu.cn/open-apis/bot/v2/hook/72aff10a-ef55-4e53-a86e-953ef6af7365`,{
                 body : JSON.stringify ({
-                    touser: toUserId,
-                    msgtype: "text",
-                    text: {
-                        content : msg,
+                    msg_type: "text",
+                    content: {
+                        text : msg,
                     },
                 }),
                 headers : {
@@ -121,19 +64,44 @@ class BotClient {
             },async (error,resp,body) => {
                 if (!error && (resp.statusCode == 200 || resp.statusCode == 400)) {
                     let resp = JSON.parse(body);
-                    if (resp.code == 99991663) {
-
-                        // token expired 
-                        console.log ("Token expired , fetch a new one.")
-                        await BotClient.fetchToken ();
-                        await BotClient.replyQ (msg,chat_id);
+                    if (resp.code == 0) {
+                        // console.log ("Notify Succeed")
                     }
                     resolve (resp);
                 } else {
-                    console.log ("Reply Error" + resp.statusCode);
+                    console.log ("Notify Error",error);
+                    reject (error);
                 }
             })
         })
+    }
+
+    static async queryInfo () {
+        let resp = await BotClient.requestCoinInfo (null);
+        let msg = '';
+        let data = resp.data;
+        for (let name in data) {
+            let info = data [name];
+            if (info?.quote) {
+                let quote = info.quote;
+                msg += `货币 ${name},当前价格为 ${quote.USD.price} USD \n`;
+            }
+        }
+
+        return msg;
+    }
+
+    static async run () {
+        this.bRun = true;
+        while (this.bRun) {
+            let msg = await this.queryInfo ();
+            BotClient.notifyMsg (msg);
+            await new Promise(resolve => setTimeout(resolve, 10000))
+        }
+    }
+
+    static async stop () {
+        this.bRun = false;
     }
 }
 
@@ -144,9 +112,15 @@ app.use(express.json ());
 app.use(express.urlencoded ());
 app.use(xmlparser ());
 
-app.post('/coin', async (req, res) => {
-    BotClient.requestClaude (req.body.question);
-})
+app.get('/coin/start', (req,res) => {
+    BotClient.run ();
+    res.send ("OK")
+});
+
+app.get('/coin/stop', (eq,res) => {
+    BotClient.stop ();
+    res.send ("OK")
+});
 
 app.get('/', async (req, res) => {
     res.send ("helloworld");
